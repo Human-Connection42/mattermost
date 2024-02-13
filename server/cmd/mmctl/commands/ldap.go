@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -52,8 +51,8 @@ var LdapJobListCmd = &cobra.Command{
 	Use:     "list",
 	Example: "  ldap job list",
 	Short:   "List LDAP sync jobs",
-	Aliases: []string{"ls"},
-	Args:    cobra.NoArgs,
+	// Aliases: []string{"ls"}, // Alisases cause error in zsh. Supposedly, completion V2 will fix that: https://github.com/spf13/cobra/pull/1146
+	Args: cobra.NoArgs,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
@@ -137,35 +136,10 @@ func ldapJobShowCmdF(c client.Client, command *cobra.Command, args []string) err
 }
 
 func ldapJobShowCmdArgsF(ctx context.Context, c client.Client, cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if toComplete == "" {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	var r []string
-	var page int
-	for {
-		jobs, _, err := c.GetJobsByType(ctx, model.JobTypeLdapSync, page, perPage)
-		if err != nil {
-			// Return what we got so far
-			return r, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		for _, j := range jobs {
-			if strings.HasPrefix(j.Id, toComplete) {
-				r = append(r, j.Id)
-			}
-		}
-
-		if len(jobs) < perPage {
-			break
-		}
-
-		page++
-	}
-
-	if len(r) > shellCompletionMaxItems {
-		r = r[:shellCompletionMaxItems]
-	}
-
-	return r, cobra.ShellCompDirectiveNoFileComp
+	return fetchAndComplete(
+		func(ctx context.Context, c client.Client, page, perPage int) ([]*model.Job, *model.Response, error) {
+			return c.GetJobsByType(ctx, model.JobTypeLdapSync, page, perPage)
+		},
+		func(t *model.Job) []string { return []string{t.Id} },
+	)(ctx, c, cmd, args, toComplete)
 }

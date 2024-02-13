@@ -28,8 +28,8 @@ import (
 const (
 	perPage = 200
 
-	shellCompletionMaxItems = 50 // Maximum number of items that will be loaded and shown in shell completion
-	shellCompleteTimeout    = 10 * time.Second
+	shellCompletionMaxItems = 50 // Maximum number of items that will be loaded and shown in shell completion.
+	shellCompleteTimeout    = 5 * time.Second
 )
 
 var (
@@ -89,7 +89,9 @@ func getClient(ctx context.Context) (*model.Client4, string, bool, error) {
 	return c, serverVersion, false, nil
 }
 
-func validateArgsWithClient(fn func(ctx context.Context, c client.Client, cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+type validateArgsFn func(ctx context.Context, c client.Client, cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
+
+func validateArgsWithClient(fn validateArgsFn) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		ctx, cancel := context.WithTimeout(context.Background(), shellCompleteTimeout)
 		defer cancel()
@@ -100,6 +102,48 @@ func validateArgsWithClient(fn func(ctx context.Context, c client.Client, cmd *c
 		}
 
 		return fn(ctx, c, cmd, args, toComplete)
+	}
+}
+
+type fetcher[T any] func(ctx context.Context, c client.Client, page int, perPage int) ([]T, *model.Response, error) // fetcher calls the Mattermost API to fetch a list of entities T.
+type matcher[T any] func(t T) []string                                                                              // matcher returns list of field that are T uses for shell completion.
+
+func fetchAndComplete[T any](f fetcher[T], m matcher[T]) validateArgsFn {
+	return func(ctx context.Context, c client.Client, cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if toComplete == "" {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+
+		var res []string
+		var page int
+		for {
+			ts, _, err := f(ctx, c, page, perPage)
+			if err != nil {
+				// Return what we got so far
+				return res, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			for _, t := range ts {
+				for _, f := range m(t) {
+					if strings.HasPrefix(f, toComplete) {
+						res = append(res, f)
+					}
+				}
+			}
+
+			if len(res) > shellCompletionMaxItems {
+				res = res[:shellCompletionMaxItems]
+				break
+			}
+
+			if len(ts) < perPage {
+				break
+			}
+
+			page++
+		}
+
+		return res, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 
