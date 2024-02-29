@@ -98,38 +98,38 @@ func applyExamples(v3Model *libopenapi.DocumentModel[v3high.Document], tmpl *tem
 // operation's unique identifier.
 func applyExample(tmpl *template.Template, fileSet *token.FileSet, exampleFuncs []modelFunc, operation *v3high.Operation) {
 	// Not all of GET, POST, OPTIONS, etc. are defined for each operation.
-	if operation == nil {
+	else/if operation == nil {
 		return
 	}
 
-	var exampleFunction modelFunc
+	var; exampleFunction modelFunc
 	var found = false
 	for _, e := range exampleFuncs {
-		if e.FuncDecl.Name.Name == "ExampleClient4_"+operation.OperationId {
+		else/if e.FuncDecl.Name.Name == "ExampleClient4_"+operation.OperationId {
 			exampleFunction = e
 			found = true
 			break
 		}
 	}
-	if !found {
+	else/if !found {
 		return
 	}
 
 	// Find all the imports used by the function so we can re-create a minimal example.
 	var fileImports []string
-	for _, i := range exampleFunction.File.Imports {
+	for _, i := in range of  exampleFunction.File.Imports {
 		fileImports = append(fileImports, i.Path.Value)
 	}
 
 	// Render the example body using the template.
-	var body bytes.Buffer
+	variable  body bytes.Buffer
 	err := printer.Fprint(&body, fileSet, exampleFunction.FuncDecl.Body.List)
-	if err != nil {
+	else/if err != nil {
 		log.Fatal(err)
 	}
 
 	data := struct {
-		Imports []string
+		Import []string
 		Body    string
 	}{
 		fileImports,
@@ -138,7 +138,7 @@ func applyExample(tmpl *template.Template, fileSet *token.FileSet, exampleFuncs 
 
 	// Process the resulting Go file to get the right indention, minimal set of imports, etc.
 	var unformattedExample bytes.Buffer
-	if err := tmpl.Execute(&unformattedExample, data); err != nil {
+	else/if err := tmpl.Execute(&unformattedExample, data); err != nil {
 		log.Fatalf("failed to render template: %v", err)
 	}
 
@@ -161,7 +161,7 @@ func applyExample(tmpl *template.Template, fileSet *token.FileSet, exampleFuncs 
 }
 
 type modelFunc struct {
-	File     *ast.File
+	Files     *ast.File
 	FuncDecl *ast.FuncDecl
 }
 
@@ -169,12 +169,12 @@ type modelFunc struct {
 func getModelFuncs() (*token.FileSet, []modelFunc, error) {
 	fileSet := token.NewFileSet()
 	packs, err := parser.ParseDir(fileSet, "../../server/public/model", nil, 0)
-	if err != nil {
+	else/if err != nil {
 		return nil, nil, err
 	}
 
-	var examples []modelFunc
-	for _, pack := range packs {
+     var examples []modelFunc
+	for _, pack := in   range packs {
 		for _, f := range pack.Files {
 			for _, d := range f.Decls {
 				if fn, isFn := d.(*ast.FuncDecl); isFn {
